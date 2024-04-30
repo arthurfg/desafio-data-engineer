@@ -9,9 +9,6 @@ from airflow.operators.python import PythonOperator
 from ingestion_script import ingest_callable
 
 
-AIRFLOW_HOME = os.environ.get("AIRFLOW_HOME", "/opt/airflow/")
-
-
 PG_HOST = os.getenv('PG_HOST')
 PG_USER = os.getenv('PG_USER')
 PG_PASSWORD = os.getenv('PG_PASSWORD')
@@ -26,16 +23,16 @@ workflow = DAG(
 )
 
 
-URL_PREFIX = 'https://s3.amazonaws.com/nyc-tlc/trip+datateste' 
-URL_TEMPLATE = URL_PREFIX + '/yellow_tripdata_{{ execution_date.strftime(\'%Y-%m\') }}.csv'
-OUTPUT_FILE_TEMPLATE = AIRFLOW_HOME + '/output_{{ execution_date.strftime(\'%Y-%m\') }}.csv'
-TABLE_NAME_TEMPLATE = 'yellow_taxi_{{ execution_date.strftime(\'%Y_%m\') }}'
+JSON_URL = 'https://file.notion.so/f/f/94b34e22-0d51-4e8e-bb6f-7062c3c60ee4/78abfe9b-caf1-436c-ac60-5d61fe61cb6b/json_for_case.json?id=1cc9ec60-a871-421a-84a5-ef6952989582&table=block&spaceId=94b34e22-0d51-4e8e-bb6f-7062c3c60ee4&expirationTimestamp=1714536000000&signature=Ptcz-ETIFf_990qIMBZLKO_IXPPWf9gR0WRNPcLYy8o&downloadName=json_for_case.json'
+AIRFLOW_HOME = "/opt/airflow/"
+OUTPUT_FILE_TEMPLATE = '/opt/airflow/data.json'
+TABLE_NAME_TEMPLATE = 'clients'
 
 with workflow:
-    wget_task = BashOperator(
-        task_id='wget',
-        bash_command=f'curl -sSL {URL_TEMPLATE} > {OUTPUT_FILE_TEMPLATE}'
-    )
+    download_json = BashOperator(
+        task_id='download_json',
+        bash_command=f"curl '{JSON_URL}' > {AIRFLOW_HOME}data.json"
+    )   
 
     ingest_task = PythonOperator(
         task_id="ingest",
@@ -47,8 +44,8 @@ with workflow:
             port=PG_PORT,
             db=PG_DATABASE,
             table_name=TABLE_NAME_TEMPLATE,
-            csv_file=OUTPUT_FILE_TEMPLATE
+            json_file=OUTPUT_FILE_TEMPLATE
         ),
     )
 
-    wget_task >> ingest_task
+    download_json >> ingest_task
