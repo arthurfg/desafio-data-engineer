@@ -11,15 +11,22 @@ services:
       - "5432:5432"
     networks:
       - airflow  
-  # pgadmin:
-  #   image: dpage/pgadmin4
-  #   environment:
-  #     - PGADMIN_DEFAULT_EMAIL=admin@admin.com 
-  #     - PGADMIN_DEFAULT_PASSWORD=root
-  #   ports:
-  #     - "8080:80"
+      - postgres-compose-network
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@admin.com 
+      - PGADMIN_DEFAULT_PASSWORD=root
+    ports:
+      - "7070:80"
+    depends_on:
+      - pgdatabase      
+    networks:
+      - postgres-compose-network
 
 networks:
   airflow:
     external:
       name: airflow_default
+  postgres-compose-network:
+    driver: bridge
