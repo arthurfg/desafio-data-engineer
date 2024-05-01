@@ -57,9 +57,7 @@ def criar_tabelas(user: str, password: str, host: str, port: int, db: str) -> No
     logging.info("Tabelas criadas com sucesso!")
 
 
-def inserir_dados(
-    user: str, password: str, host: str, port: int, db: str, json_file: str
-) -> None:
+def inserir_dados(user: str, password: str, host: str, port: int, db: str, json_file: str) -> None:
     """Insere dados do arquivo JSON no banco de dados postgres.
 
     Args:
@@ -70,53 +68,40 @@ def inserir_dados(
         db (str): Nome do banco de dados.
         json_file (str): Caminho para o arquivo JSON contendo os dados a serem inseridos.
     """
-    engine = create_engine(f"postgresql://{user}:{password}@{host}:{port}/{db}")
+    engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{db}')
     Session = sessionmaker(bind=engine)
+    session = Session()
+    logging.info('Conexão estabelecida com sucesso, inserindo dados...')
+
+    with open(json_file) as file:
+        data = json.load(file)
 
     try:
-        with open(json_file) as file:
-            data = json.load(file)
+        with session.begin():
+            for item in data:
+                usuario = session.query(Usuario).filter_by(id=item['id']).first()
+                if usuario is None:
+                    logging.info("Usuário não existe, criando novo usuário")
+                    usuario = Usuario(nome=item['nome'], idade=item['idade'], email=item['email'], telefone=item['telefone'])
+                    session.add(usuario)
+                else:
+                    logging.info("Usuário já existe, utilizando usuário existente")
 
-        session = Session()
-        logging.info("Conexão estabelecida com sucesso, inserindo dados...")
+                endereco = session.query(Endereco).filter_by(cep=item['endereco']['cep'], numero=item['endereco']['numero'], logradouro=item['endereco']['logradouro']).first()
+                if endereco is None:
+                    logging.info("Endereço não existe, criando novo endereço")
+                    endereco = Endereco(logradouro=item['endereco']['logradouro'], numero=item['endereco']['numero'],
+                                        bairro=item['endereco']['bairro'], cidade=item['endereco']['cidade'],
+                                        estado=item['endereco']['estado'], cep=item['endereco']['cep'], usuario=usuario)
+                    session.add(endereco)
+                else:
+                    logging.info("Endereço já existe, utilizando endereço existente")
 
-        for item in data:
-            usuario = session.query(Usuario).filter_by(id=item["id"]).first()
-            if usuario is None:
-                logging.info("Usuário não existe, criando novo usuário")
-                usuario = Usuario(
-                    nome=item["nome"],
-                    idade=item["idade"],
-                    email=item["email"],
-                    telefone=item["telefone"],
-                )
-                session.add(usuario)
-
-            endereco = (
-                session.query(Endereco)
-                .filter_by(
-                    cep=item["endereco"]["cep"], numero=item["endereco"]["numero"]
-                )
-                .first()
-            )
-            if endereco is None:
-                logging.info("Endereço não existe, criando novo endereço")
-                endereco = Endereco(
-                    logradouro=item["endereco"]["logradouro"],
-                    numero=item["endereco"]["numero"],
-                    bairro=item["endereco"]["bairro"],
-                    cidade=item["endereco"]["cidade"],
-                    estado=item["endereco"]["estado"],
-                    cep=item["endereco"]["cep"],
-                    usuario=usuario,
-                )
-                session.add(endereco)
-
-        session.commit()
-        logging.info("Inserção de dados concluída com sucesso!")
-    except (IntegrityError, Exception) as e:
+            logging.info("Inserção de dados concluída com sucesso!")
+    except IntegrityError as e:
         session.rollback()
-        logging.error(f"Erro ao inserir dados: {e}")
+        logging.error(f"Erro de integridade ao inserir dados: {e}")
         raise e
     finally:
+        session.commit()
         session.close()
