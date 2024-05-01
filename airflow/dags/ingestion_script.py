@@ -1,49 +1,122 @@
-import os
-
-from time import time
-
-import pandas as pd
-from sqlalchemy import create_engine
+# -*- coding: utf-8 -*-
 import json
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.exc import IntegrityError
+import logging
 
-def ingest_callable(user, password, host, port, db, table_name, json_file):
-    print(table_name, json_file)
 
-    engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{db}')
-    engine.connect()
+Base = declarative_base()
 
-    print('connection established successfully, inserting data...')
 
-    t_start = time()
+class Usuario(Base):
+    """Classe que representa a tabela 'usuarios' no banco de dados."""
 
-    with open(json_file) as file:
-        data = json.load(file)    
-    # #df_iter = pd.read_csv(json_file, iterator=True, chunksize=100000)
-    df = pd.json_normalize(data)
-    # # df = next(df_iter)
+    __tablename__ = "usuarios"
 
-    # # df.tpep_pickup_datetime = pd.to_datetime(df.tpep_pickup_datetime)
-    # # df.tpep_dropoff_datetime = pd.to_datetime(df.tpep_dropoff_datetime)
-    df.head(n=0).to_sql(name=table_name, con=engine, if_exists='replace')
+    id = Column(Integer, primary_key=True)
+    nome = Column(String)
+    idade = Column(Integer)
+    email = Column(String)
+    telefone = Column(String)
 
-    df.to_sql(name=table_name, con=engine, if_exists='append')
+    enderecos = relationship("Endereco", back_populates="usuario")
 
-    t_end = time()
-    print('inserted the first chunk, took %.3f second' % (t_end - t_start))
 
-    # while True: 
-    #     t_start = time()
+class Endereco(Base):
+    """Classe que representa a tabela 'enderecos' no banco de dados."""
 
-    #     try:
-    #         df = next(df_iter)
-    #     except StopIteration:
-    #         print("completed")
-    #         break
+    __tablename__ = "enderecos"
 
-    #     df.tpep_pickup_datetime = pd.to_datetime(df.tpep_pickup_datetime)
+    id = Column(Integer, primary_key=True)
+    logradouro = Column(String)
+    numero = Column(Integer)
+    bairro = Column(String)
+    cidade = Column(String)
+    estado = Column(String)
+    cep = Column(String)
+    user_id = Column(Integer, ForeignKey("usuarios.id"))
 
-    #     df.to_sql(name=table_name, con=engine, if_exists='append')
+    usuario = relationship("Usuario", back_populates="enderecos")
 
-    #     t_end = time()
 
-    #     print('inserted another chunk, took %.3f second' % (t_end - t_start))
+def criar_tabelas(user: str, password: str, host: str, port: int, db: str) -> None:
+    """Cria as tabelas no banco de dados se elas não existirem.
+
+    Args:
+        user (str): Nome de usuário para a conexão com o banco de dados.
+        password (str): Senha para a conexão com o banco de dados.
+        host (str): Endereço do host do banco de dados.
+        port (int): Número da porta do banco de dados.
+        db (str): Nome do banco de dados.
+    """
+
+    engine = create_engine(f"postgresql://{user}:{password}@{host}:{port}/{db}")
+    Base.metadata.create_all(engine)
+    logging.info("Tabelas criadas com sucesso!")
+
+
+def inserir_dados(
+    user: str, password: str, host: str, port: int, db: str, json_file: str
+) -> None:
+    """Insere dados do arquivo JSON no banco de dados postgres.
+
+    Args:
+        user (str): Nome de usuário para a conexão com o banco de dados.
+        password (str): Senha para a conexão com o banco de dados.
+        host (str): Endereço do host do banco de dados.
+        port (int): Número da porta do banco de dados.
+        db (str): Nome do banco de dados.
+        json_file (str): Caminho para o arquivo JSON contendo os dados a serem inseridos.
+    """
+    engine = create_engine(f"postgresql://{user}:{password}@{host}:{port}/{db}")
+    Session = sessionmaker(bind=engine)
+
+    try:
+        with open(json_file) as file:
+            data = json.load(file)
+
+        session = Session()
+        logging.info("Conexão estabelecida com sucesso, inserindo dados...")
+
+        for item in data:
+            usuario = session.query(Usuario).filter_by(id=item["id"]).first()
+            if usuario is None:
+                logging.info("Usuário não existe, criando novo usuário")
+                usuario = Usuario(
+                    nome=item["nome"],
+                    idade=item["idade"],
+                    email=item["email"],
+                    telefone=item["telefone"],
+                )
+                session.add(usuario)
+
+            endereco = (
+                session.query(Endereco)
+                .filter_by(
+                    cep=item["endereco"]["cep"], numero=item["endereco"]["numero"]
+                )
+                .first()
+            )
+            if endereco is None:
+                logging.info("Endereço não existe, criando novo endereço")
+                endereco = Endereco(
+                    logradouro=item["endereco"]["logradouro"],
+                    numero=item["endereco"]["numero"],
+                    bairro=item["endereco"]["bairro"],
+                    cidade=item["endereco"]["cidade"],
+                    estado=item["endereco"]["estado"],
+                    cep=item["endereco"]["cep"],
+                    usuario=usuario,
+                )
+                session.add(endereco)
+
+        session.commit()
+        logging.info("Inserção de dados concluída com sucesso!")
+    except (IntegrityError, Exception) as e:
+        session.rollback()
+        logging.error(f"Erro ao inserir dados: {e}")
+        raise e
+    finally:
+        session.close()
