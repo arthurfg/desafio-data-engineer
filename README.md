@@ -4,13 +4,13 @@
 ## Objetivo
 Resolver os problemas propostos pelo desafio utilizando uma arquitetura simples, resiliente e escalável.
 
-## Visão Geral
-### Modelagem
+# Visão Geral
+## Modelagem
 Por existir a possibilidade de uma relação _1:n_ entre a entidade `usuário` e a entidade `endereço`, decidi modelar os dados em duas tabelas, uma para usuários e outra para endereços. Ao alterar a modelagem dos dados, as tabelas ficam na Terceira Forma Normal, melhorando a estrutura do banco de dados.
 
 <img src="https://github.com/arthurfg/desafio-capim/assets/62671380/3f4890f5-b14f-4538-8fa8-1319b8972919" width="600" height="600">
 
-### Infraestrutura
+## Infraestrutura
 
 - **Docker**: Conteinerização
 
@@ -44,11 +44,11 @@ networks:
     external:
       name: airflow_default
 ```
-### Diagrama
+## Diagrama
 
 ![diagram-export-01-05-2024-22_51_28](https://github.com/arthurfg/desafio-capim/assets/62671380/d841e880-b9e7-4af0-a1c6-06b4b4c50ab6)
 
-### Fluxo dos dados
+## Fluxo dos dados
 
 O airflow executa a DAG com o nome de `CompleteIngestionDag`, que está no arquivo `./airflow/data_ingestion_local.py`. Ela possui 4 tasks que fazem o processo de extração -> validação -> criação das tabelas -> carregamento dos dados no banco. Os dados brutos são extraídos da URL e salvos em um arquivo `data.json`, em seguida passam pela validação feita através do `pydantic`, que verifica o tipo dos dados, o schema e outras condições específicas (como o formato dos dados da coluna `cep`, por exemplo). Caso passem na validação, as tabelas são criadas -- caso não existam --  e os dados são carregados.
 
@@ -56,7 +56,63 @@ Visando resolver o problema do desafio, uma lógica foi criada para impossibilit
 
 <img width="1385" alt="Captura de Tela 2024-05-01 às 23 42 03" src="https://github.com/arthurfg/desafio-capim/assets/62671380/70dc31c9-07ac-4ef5-a6a4-f17ffa0af37f">
 
-### Dashboard
+## Dashboard
 <img width="1074" alt="Captura de Tela 2024-05-01 às 23 47 55" src="https://github.com/arthurfg/desafio-capim/assets/62671380/690561e8-02ed-417e-902c-89608a76b334">
 <img width="1094" alt="Captura de Tela 2024-05-01 às 23 48 04" src="https://github.com/arthurfg/desafio-capim/assets/62671380/c973a227-2949-4a9e-8576-440858d5bb12">
+
+
+
+## Rodando o projeto
+1. Clone o repositório:
+```bash
+git clone https://github.com/arthurfg/desafio-data-engineer.git
+```
+
+2. Navege até o repo:
+```bash
+cd </path/to/repo>
+```
+
+
+3. Crie um arquivo `.env` com essas variáveis:
+```
+AIRFLOW_UID=<seu UID>
+PG_HOST=pgdatabase
+PG_USER=root
+PG_PASSWORD=root
+PG_PORT=5432
+PG_DATABASE=capim
+```
+Caso use linux/mac, insira o ID que resulta desse comando na variável de ambiente `AIRFLOW_UID`:
+```bash
+echo "$(id -u)" 
+```
+Caso use outro sistema operacional use `AIRFLOW_UID=50000`.
+
+4. Navege até o diretório `./airflow`:
+```bash
+cd airflow
+```
+
+5. Inicialize o airflow:
+```bash
+docker compose up airflow-init
+```
+
+6. Rode o docker compose:
+```bash
+docker compose up
+```
+
+7. Navege até o diretório `./postgres`:
+```bash
+cd postgres
+```
+
+8. Rode o docker compose:
+```bash
+docker compose up
+```
+
+Após todos os contêiners estarem ativos e rodando, vá até o `http://localhost:8080/`, digite o usuário `airflow` e a senha `airflow` e rode a DAG `CompleteIngestionDag`.
 
