@@ -1,4 +1,4 @@
-# Desafio Data Engineer 2024 - Capim
+# Desafio Data Engineer 2024
 ### Arthur Gusmão
 
 ## Objetivo
