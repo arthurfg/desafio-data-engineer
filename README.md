@@ -22,7 +22,7 @@ Por existir a possibilidade de uma relação _1:n_ entre a entidade `usuário` e
 
 - **Metabase**: Dashboard
 
-Todos os serviços utilizados no desafio estão dockerizados, garantindo reprodutibilidade e escalabilidade. O ambiente é simples e está dividido em dois elementos principais: o banco de dados e o orquestrador. A divisão dos ambientes foi feita através dos arquivos `docker-compose.yaml`, o primeiro arquivo, referente ao ambiente do Airflow, centraliza todos os serviços necessários para a sua execução (banco de dados, variáveis de ambiente, requirements, webserver e etc) e o segundo, referente ao ambiente do Postgres, centraliza os serviços necessários para a sua execução além de criar as conexões necessárias entre o banco, o PgAdmin e o Metabase.
+Todos os serviços utilizados no desafio estão dockerizados, garantindo reprodutibilidade e escalabilidade. O ambiente é simples e está dividido em dois elementos principais: o **banco de dados** e o **orquestrador**. A divisão dos ambientes foi feita através dos arquivos `docker-compose.yaml`, o primeiro arquivo, referente ao ambiente do Airflow, centraliza todos os serviços necessários para a sua execução (banco de dados, variáveis de ambiente, requirements, webserver e etc) e o segundo, referente ao ambiente do Postgres, centraliza os serviços necessários para a sua execução além de criar as conexões necessárias entre o banco, o PgAdmin e o Metabase.
 
 Uma observação importante é que precisa haver uma conexão ativa entre os dois _docker composes_, para que o Airflow consiga se comunicar com o banco Postgres e vice-versa. Para isso, foi criado um arquivo `.env` contendo as variáveis de ambiente necessárias para o Airflow se comunicar com o Postgres, além da criação da conexão entre o contêiner do banco e o contêiner do worker do Airflow (que é responsável por executar as DAGs).
 
@@ -50,9 +50,9 @@ networks:
 
 ### Fluxo dos dados
 
-A DAG criada no Airflow possui 4 tasks que fazem o processo de extração -> validação -> criação das tabelas -> carregamento dos dados no banco. Os dados brutos são extraídos da URL passada e salvos em um arquivo data.json, passam pela validação que é feita através do `pydantic` e, caso passem na validação, as tabelas são criadas (caso não existam) e os dados são carregados nas tabelas do banco.
+O airflow executa a DAG com o nome de `CompleteIngestionDag`, que está no arquivo `./airflow/data_ingestion_local.py`. Ela possui 4 tasks que fazem o processo de extração -> validação -> criação das tabelas -> carregamento dos dados no banco. Os dados brutos são extraídos da URL e salvos em um arquivo `data.json`, em seguida passam pela validação feita através do `pydantic`, que verifica o tipo dos dados, o schema e outras condições específicas (como o formato dos dados da coluna `cep`, por exemplo). Caso passem na validação, as tabelas são criadas -- caso não existam --  e os dados são carregados.
 
-Visando resolver o problema do desafio, uma lógica foi criada para impossibilitar o carregamento de dados duplicados no banco, através da conferência da existência da chave única na tabela de usuários e da existência do conjunto `cep ~ logradouro ~ número` na tabela de endereços. Esse processo garante a integridade e a atomicidade dos dados.
+Visando resolver o problema do desafio, uma lógica foi criada para impossibilitar o carregamento de dados duplicados no banco. O fluxo confere a existência da chave única na tabela de usuários e a existência do conjunto `cep ~ logradouro ~ número` na tabela de endereços, para todas as observações, e só insere os novos dados se eles forem únicos e se não existirem previamente no banco. Esse processo garante a integridade e a atomicidade dos dados.
 
 <img width="1385" alt="Captura de Tela 2024-05-01 às 23 42 03" src="https://github.com/arthurfg/desafio-capim/assets/62671380/70dc31c9-07ac-4ef5-a6a4-f17ffa0af37f">
 
