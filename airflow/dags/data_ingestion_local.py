@@ -7,7 +7,7 @@ from airflow import DAG
 
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
-from ingestion_script import criar_tabelas, inserir_dados
+from ingestion_script import criar_tabelas, inserir_dados, validar_dados
 
 
 
@@ -46,6 +46,13 @@ with workflow:
         ),
     )
 
+    validation_task = PythonOperator(
+        task_id="validate",
+        python_callable=validar_dados,
+        op_kwargs=dict(
+            json_file=OUTPUT_FILE_TEMPLATE,
+        ),
+    )
     ingest_task = PythonOperator(
         task_id="ingest",
         python_callable=inserir_dados,
@@ -59,4 +66,4 @@ with workflow:
         ),
     )
 
-    download_json >> create_tables >> ingest_task
+    download_json >> validation_task >> create_tables >> ingest_task

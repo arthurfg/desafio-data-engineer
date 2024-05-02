@@ -5,7 +5,32 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.exc import IntegrityError
 import logging
+from pydantic import BaseModel, constr, ValidationError
+from typing import Optional
 
+
+## 
+# Classes pydantic
+##
+
+class ValidadorEndereco(BaseModel):
+    logradouro: str
+    numero: int
+    bairro: str
+    cidade: str
+    estado: str
+    cep: constr(pattern=r'^\d{5}-\d{3}$')
+
+class ValidadorUsuario(BaseModel):
+    id: int
+    nome: str
+    idade: int
+    email: constr(pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    telefone: str
+    endereco: ValidadorEndereco
+##
+# Modelos
+#
 
 Base = declarative_base()
 
@@ -41,6 +66,10 @@ class Endereco(Base):
     usuario = relationship("Usuario", back_populates="enderecos")
 
 
+##
+# Funções
+##
+
 def criar_tabelas(user: str, password: str, host: str, port: int, db: str) -> None:
     """Cria as tabelas no banco de dados se elas não existirem.
 
@@ -56,6 +85,23 @@ def criar_tabelas(user: str, password: str, host: str, port: int, db: str) -> No
     Base.metadata.create_all(engine)
     logging.info("Tabelas criadas com sucesso!")
 
+
+def validar_dados(json_file: str) -> None:
+    """Valida dados do arquivo JSON
+
+    Args:
+         json_file (str): Caminho para o arquivo JSON contendo os dados a serem validados.
+    """
+
+
+    with open(json_file) as file:
+        data = json.load(file)
+    for item in data:
+        try:
+            obs = ValidadorUsuario(**item)
+            print("Dados válidos:", obs)
+        except ValidationError as e:
+            print("Erro de validação:", e)
 
 def inserir_dados(user: str, password: str, host: str, port: int, db: str, json_file: str) -> None:
     """Insere dados do arquivo JSON no banco de dados postgres.
@@ -93,6 +139,7 @@ def inserir_dados(user: str, password: str, host: str, port: int, db: str, json_
                     endereco = Endereco(logradouro=item['endereco']['logradouro'], numero=item['endereco']['numero'],
                                         bairro=item['endereco']['bairro'], cidade=item['endereco']['cidade'],
                                         estado=item['endereco']['estado'], cep=item['endereco']['cep'], usuario=usuario)
+                 
                     session.add(endereco)
                 else:
                     logging.info("Endereço já existe, utilizando endereço existente")
